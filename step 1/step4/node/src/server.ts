@@ -1,15 +1,15 @@
 import "dotenv/config";
 
 import { createApp } from "./app";
-import { createSummarizeService } from "./summarizeService";
-import { createWebsiteBuilderService } from "./websiteBuilderService";
+import { createSummarizeService } from "./chatService";
+
 
 async function main() {
   const port = process.env.PORT || 8080;
 
   const app = createApp({
     summarizeService: createSummarizeService(),
-    websiteBuilderService: await createWebsiteBuilderService(),
+   
   });
 
   app.listen(port, () => {

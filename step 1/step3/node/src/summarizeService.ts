@@ -1,27 +1,23 @@
 import { OpenRouter } from "@openrouter/sdk";
+import { runWithTools, type ChatMessage } from "./agent";
+import { calculatorTool } from "./aitools/calculatorTool";
+import { weatherTool } from "./aitools/weatherTool";
+import { currencyExchangeTool } from "./aitools/currencyExchangeTool";
 
 const DEFAULT_MODEL = "openai/gpt-5.6-luna";
 
 const SYSTEM_PROMPT = `
-You are a customer-support executive for our
-Food ordering app named Tomato.
+You are a helpful AI assistant with access to external tools.
 
-Your job is to identify the customer's main
-problem and urgency. Answer them related to their query in 1 line.
-
-Use professional language. If user has an issue,
-use words like I understand your frustration,
-I am really sorry for your trouble etc.
-
-Do not answer any other question which is not
-related to Ordering Food query, refund query,
-order tracking status query or company policy query.
+Follow these rules:
+1. For arithmetic calculations, ALWAYS use the calculator tool.
+2. Always use calculator tool for even trivial calculation
+3. For current weather, ALWAYS use the currentWeather tool.
+4. For currency conversion or exchange rates, ALWAYS use the getExchangeRate tool.
+5. You may call multiple tools when solving a multi-step request.
+6. After receiving tool results, explain the answer naturally.
+7. Never invent current weather or exchange-rate information.
 `.trim();
-
-type ChatMessage = {
-  role: "user" | "assistant";
-  content: string;
-};
 
 export interface SummarizeService {
   chat(message: string): Promise<string>;
@@ -31,40 +27,25 @@ export function createSummarizeService({
   client = new OpenRouter({ apiKey: process.env.API_KEY }),
   model = process.env.MODEL || DEFAULT_MODEL,
 }: { client?: OpenRouter; model?: string } = {}): SummarizeService {
-  
   const history: ChatMessage[] = [];
+  const tools = [calculatorTool, weatherTool, currencyExchangeTool];
 
   return {
-    async chat(message: string): Promise<string> {
+    async chat(message) {
       history.push({ role: "user", content: message });
 
       try {
-        const response = await client.chat.send({
-          chatRequest: {
-            model,
-            stream: false,
-            maxTokens: 300,
-            messages: [
-              { role: "system", content: SYSTEM_PROMPT }, 
-              ...history,                                  
-            ],
-          },
+        const output = await runWithTools({
+          client,
+          model,
+          systemPrompt: SYSTEM_PROMPT,
+          history,
+          tools,
         });
-
-        if (!("choices" in response)) {
-          throw new Error("Expected a non-streaming response");
-        }
-
-        const content = response.choices[0]?.message?.content;
-
-        if (typeof content !== "string" || !content.trim()) {
-          throw new Error("The model returned an empty reply");
-        }
-
-        history.push({ role: "assistant", content });
-        return content;
+        history.push({ role: "assistant", content: output });
+        return output;
       } catch (error) {
-        history.pop(); 
+        history.pop();
         throw error;
       }
     },

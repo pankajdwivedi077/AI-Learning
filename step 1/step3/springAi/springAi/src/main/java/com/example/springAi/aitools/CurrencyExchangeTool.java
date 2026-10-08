@@ -1,0 +1,39 @@
+package com.example.springAi.aitools;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
+import org.springframework.web.client.RestClient;
+import org.springframework.ai.tool.annotation.Tool;
+import org.springframework.ai.tool.annotation.ToolParam;
+
+@Component
+public class CurrencyExchangeTool {
+
+    private RestClient restClient;
+
+    @Autowired
+    public CurrencyExchangeTool(RestClient.Builder builder){
+       this.restClient = builder
+               .baseUrl("https://api.frankfurter.dev")
+               .build();
+    }
+
+    @Tool(description = "Gets the latest exchange rate " +
+            "between two currencies.")
+    public String getExchangeRate(
+            @ToolParam(description = "Source currency code, " +
+                    "for example USD")
+            String from,
+            @ToolParam(description = "Target currency code," +
+                    " for example INR")
+            String to) {
+
+        System.out.println("Currency Exchange tool called");
+
+        return restClient.get()
+                .uri("/v2/rate/{from}/{to}", from, to)
+                .retrieve()
+                .body(String.class);
+    }
+
+}
