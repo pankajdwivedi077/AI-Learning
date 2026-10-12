@@ -1,11 +1,16 @@
 import express, { type Request, type Response } from "express";
 import cors from "cors";
 import type { SummarizeService } from "./chatService";
+import { MovieNotFoundError, type MovieService } from "./movieService";
 
-export function createApp(services: { summarizeService: SummarizeService }) {
-  const { summarizeService } = services;
+export function createApp(services: {
+  summarizeService: SummarizeService;
+  movieService: MovieService;
+}) {
+  const { summarizeService, movieService } = services;
 
   if (!summarizeService?.chat) throw new TypeError("A chat service is required");
+  if (!movieService?.search) throw new TypeError("A movie service is required");
 
   const app = express();
   app.use(cors({ origin: "*" }));
@@ -50,6 +55,37 @@ export function createApp(services: { summarizeService: SummarizeService }) {
       } else {
         response.end();
       }
+    }
+  });
+
+  // GET /api/movie/search?query=space adventure
+  app.get("/api/movie/search", async (request: Request, response: Response) => {
+    const query = request.query.query;
+    if (typeof query !== "string" || !query.trim()) {
+      return response.status(400).json({ error: "Query parameter 'query' is required." });
+    }
+    try {
+      return response.json(await movieService.search(query));
+    } catch (error) {
+      console.error("Movie search failed:", error);
+      return response.status(500).json({ error: "Unable to search movies." });
+    }
+  });
+
+  // GET /api/movie/similar?title=Inception
+  app.get("/api/movie/similar", (request: Request, response: Response) => {
+    const title = request.query.title;
+    if (typeof title !== "string" || !title.trim()) {
+      return response.status(400).json({ error: "Query parameter 'title' is required." });
+    }
+    try {
+      return response.json(movieService.similarMovies(title));
+    } catch (error) {
+      if (error instanceof MovieNotFoundError) {
+        return response.status(404).json({ error: error.message });
+      }
+      console.error("Similar movies failed:", error);
+      return response.status(500).json({ error: "Unable to find similar movies." });
     }
   });
 
