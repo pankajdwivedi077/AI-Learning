@@ -1,18 +1,22 @@
 import "dotenv/config";
 
 import { createApp } from "./app";
-import { createSummarizeService } from "./chatService";
-import { createMovieService } from "./movieService";
+import { createChatbotService } from "./chatbotservice";
+import { createKnowledgeBase } from "./knowledgebase";
 
 async function main() {
   const port = process.env.PORT || 8080;
 
-  const movieService = createMovieService();
-  await movieService.initialize();
+  const knowledgeBase = createKnowledgeBase();
+
+  // Pinecone is persistent, so only load the PDFs when you ask for it:
+  // set INGEST=true in .env for the first run (or after changing the PDFs).
+  if (process.env.INGEST === "true") {
+    await knowledgeBase.ingest();
+  }
 
   const app = createApp({
-    summarizeService: createSummarizeService(),
-    movieService,
+    chatbotService: createChatbotService({ knowledgeBase }),
   });
 
   app.listen(port, () => {
